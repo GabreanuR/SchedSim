@@ -3,8 +3,6 @@
 **Curs:** Sisteme de Operare  
 **Echipa:** Răzvan & Maia
 
-==========================
-
 ## 📋 Tema Proiectului
 
 Scopul acestui proiect este scrierea unui **simulator de procese** care să fie folosit pentru a evalua performanța algoritmilor de scheduling. Aplicația trebuie să suporte:
@@ -16,16 +14,12 @@ Simulatorul va oferi utilizatorilor indicatori standard de performanță, precum
 * Timpul de așteptare (Waiting Time).
 * Timpul de răspuns (Turnaround Time).
 
-==========================
-
 ## 📚 Surse și Bibliografie
 
 * [GeeksForGeeks: CPU Scheduling in Operating Systems](https://www.geeksforgeeks.org/operating-systems/cpu-scheduling-in-operating-systems/)
 * [GeeksForGeeks: Difference between Arrival Time and Burst Time](https://www.geeksforgeeks.org/operating-systems/difference-between-arrival-time-and-burst-time-in-cpu-scheduling/)
 * [GeeksForGeeks: Earliest Deadline First (EDF)](https://www.geeksforgeeks.org/operating-systems/earliest-deadline-first-edf-cpu-scheduling-algorithm/)
 * [TutorialsPoint: C function strtol](https://www.tutorialspoint.com/c_standard_library/c_function_strtol.htm)
-
-==========================
 
 ## 📝 Convenții de Codare
 
@@ -38,7 +32,6 @@ Pentru a facilita debugging-ul și urmărirea fluxului de execuție, toate mesaj
 printf("[Main] SchedSim: Simulator Planificare Procese\n\n");
 printf("[Scheduler] Analiza proceselor...\n");
 ```
-==========================
 
 ## Ghid de Utilizare (Compilare și Rulare)
 
@@ -92,14 +85,10 @@ Doriți să testați algoritmul EDF cu 50 de procese generate aleator:
     ```bash
     ./schedsim edf
     ```
-
-==========================
-
+    
 ## Detalii Implementare - Infrastructură (Partea lui Răzvan)
 
 Această secțiune detaliază arhitectura proiectului, organizarea fișierelor și logica de gestionare a datelor.
-
-==========================
 
 ### 1. Structura Folderelor
 
@@ -226,11 +215,8 @@ Acest modul gestionează interacțiunea cu fișierele de date și transformarea 
 4.  **Afișare (Faza 3):**
     Doar dacă toate validările au trecut, afișează tabelul cu procesele încărcate. Această separare asigură că utilizatorul nu primește informații vizuale eronate în caz de eșec.
 
-==========================
+## Partea Maiei:
 
-Partea Maiei:
-
-==========================
 (Student 2 - Algoritmii & Analiza)
 Scop: Să ia motorul tău și să-l facă "inteligent", adăugând regulile de scheduling și calculând notele finale.
 
@@ -256,8 +242,4 @@ Generarea tabelului cu statistici.
 
 (Opțional) O diagramă Gantt text-based (ex: | P1 | P1 | P2 | P1 |).
 
-==========================
-
-Va multumim!
-
-==========================
+## Va multumim!
