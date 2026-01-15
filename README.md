@@ -217,29 +217,86 @@ Acest modul gestionează interacțiunea cu fișierele de date și transformarea 
 
 ## Partea Maiei:
 
-(Student 2 - Algoritmii & Analiza)
-Scop: Să ia motorul tău și să-l facă "inteligent", adăugând regulile de scheduling și calculând notele finale.
+1. Modulul de Scheduling și Analiză (Partea Maiei)
+Această secțiune descrie implementarea efectivă a algoritmilor de planificare a proceselor, mecanismul de simulare preemptivă și calculul metricilor de performanță. Modulul este implementat în fișierul scheduler.c și reprezintă „inteligența” simulatorului.
 
-Logica de Selecție (Inima proiectului):
+2. Diagrama Gantt (Reprezentare Vizuală)
+Pentru a evidenția comportamentul algoritmilor de scheduling și preempțiunea, simulatorul construiește o diagramă Gantt text-based, într-o formă compactă.
+Fiecare segment din diagramă conține:
+PID-ul procesului care rulează
+intervalul de timp [start, end)
+Procesele consecutive identice sunt comasate într-un singur segment, pentru lizibilitate.
+Intervalele în care CPU-ul nu execută niciun proces sunt marcate ca IDLE.
+Această diagramă este utilă pentru:
+verificarea corectitudinii algoritmilor,
+evidențierea preempțiunilor,
+analiza vizuală a execuției proceselor.
 
-Implementarea algoritmului Priority Scheduling (trebuie să decidă dacă e preemptiv sau non-preemptiv).
+3. Logica de Selecție a Proceselor
+Selecția procesului care va rula pe CPU se face la fiecare unitate de timp, asigurând un comportament preemptiv.
+Priority Scheduling (Preemptiv)
+Se consideră că o valoare mai mică a câmpului priority înseamnă o prioritate mai mare (ex: priority = 1 este cea mai mare).
+La fiecare pas de timp, este ales procesul cu prioritatea cea mai mare din ready_queue.
+Dacă două procese au aceeași prioritate:
+se alege procesul cu arrival_time mai mic,
+în caz de egalitate, procesul cu PID mai mic.
+Această strategie garantează selecție deterministă și corectă.
+Earliest Deadline First (EDF – Real-Time)
+Se alege procesul cu deadline-ul cel mai apropiat.
+O valoare mai mică a câmpului deadline indică un proces mai urgent.
+Tie-break-ul se face identic cu Priority Scheduling (arrival time, apoi PID).
+Algoritmul este complet preemptiv, fiind reevaluat la fiecare unitate de timp.
 
-Implementarea algoritmului Real-Time (recomand EDF - Earliest Deadline First, e cel mai standard pentru real-time). Aici trebuie să verifice dacă un proces își depășește deadline-ul.
+4. Simularea Preemptivă
+Motorul de simulare funcționează pe unități discrete de timp:
+La fiecare pas:
+sunt adăugate în ready_queue procesele care au sosit,
+se selectează procesul optim conform algoritmului ales,
+procesul rulează exact o unitate de timp.
+Dacă apare un proces mai prioritar sau cu deadline mai urgent, CPU-ul este preemptat.
+Execuția continuă până când toate procesele sunt finalizate.
+Această abordare reflectă fidel comportamentul unui scheduler real dintr-un sistem de operare.
 
-Calculul Metricilor:
+5. Calculul Metricilor de Performanță
+Pentru fiecare proces sunt calculate următoarele valori:
+Start Time – momentul primei execuții pe CPU.
+Finish Time – momentul finalizării execuției.
+Response Time
+Response Time = Start Time – Arrival Time
+Turnaround Time
+Turnaround Time = Finish Time – Arrival Time
+Waiting Time
+Waiting Time = Turnaround Time – Burst Time
+Pentru algoritmul EDF, se verifică suplimentar:
+dacă Finish Time > Deadline, procesul este marcat ca deadline miss.
 
-După ce un proces termină, ea trebuie să calculeze:
+6. Metrici Globale și Performanță
+După finalizarea simulării, sunt calculate metrici globale:
+Average Waiting Time
+Average Turnaround Time
+Average Response Time
+Acestea sunt obținute prin însumarea valorilor individuale și împărțirea la numărul total de procese.
+CPU Utilization
+Utilizarea procesorului este calculată astfel:
+CPU Utilization = (Busy Time / Total Time) × 100
+Busy Time reprezintă timpul total în care CPU-ul a executat procese.
+Total Time include și perioadele de inactivitate (IDLE).
 
-Turnaround Time = Finish Time - Arrival Time.
+7. Afișarea Rezultatelor
+La finalul simulării, modulul afișează:
+Diagrama Gantt compactă
+Tabelul complet cu statistici pentru fiecare proces
+Rezumatul performanței globale
+Pentru EDF, un mesaj explicit care indică dacă au existat procese ce au depășit deadline-ul
+Toate mesajele sunt afișate respectând convenția de tagging:
+[Scheduler] Mesaj
 
-Waiting Time = Turnaround Time - Burst Time.
-
-CPU Utilization.
-
-Afișarea Finală:
-
-Generarea tabelului cu statistici.
-
-(Opțional) O diagramă Gantt text-based (ex: | P1 | P1 | P2 | P1 |).
+8. Concluzie
+Modulul de scheduling implementează complet și corect:
+Priority Scheduling preemptiv
+Earliest Deadline First (EDF)
+Simulare realistă a execuției proceselor
+Analiză detaliată a performanței
+Acesta permite compararea directă a algoritmilor și oferă atât rezultate numerice, cât și o reprezentare vizuală clară a execuției.
 
 ## Va multumim!
