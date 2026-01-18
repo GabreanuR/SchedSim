@@ -1,391 +1,334 @@
 #include <stdio.h>
-#include "scheduler.h"
 #include <stdlib.h>
+#include "scheduler.h"
 
-
-//segment pentru diagrama
 typedef struct {
-    int pid; // este IDLE daca e -1
+    int pid; // -1 pentru IDLE
     int start;
     int end;
- } DiagSeg;
+} DiagSeg;
 
+// Adauga un segment nou in diagrama (cu realocare dinamica)
+static void diag_add(DiagSeg **seg, int *count, int *cap, int pid, int start, int end) {
+    if (start >= end) return; // Ignoram segmentele de lungime 0
 
-//functie pentru a adauga un segment nou in diagrama
-static void diag_add(DiagSeg **seg, int *count, int *cap, int pid, int start, int end)
-{
-    if(start >= end) return; // nu are sens sa fie adaugat (ar fi segment gol)
-
-    //daca ultimul segment din lista are acelasi pid si se continua exact (vechiul end = actualul start) -> extindem ultimul segment
-    if(*count > 0 && (*seg)[(*count) - 1].pid == pid && (*seg)[(*count) - 1].end == start)
-    {
+    // Optimizare: Daca ultimul segment e acelasi proces, il extindem
+    if (*count > 0 && (*seg)[(*count) - 1].pid == pid && (*seg)[(*count) - 1].end == start) {
         (*seg)[(*count) - 1].end = end;
         return;
     }
 
-    //daca vectorul e plin, face realloc ca sa il mareasca
-    if(*count >= *cap)
-    {
-        int new_cap;
-        if(*cap == 0)
-            new_cap = 16;
-        else
-            new_cap = (*cap * 2);
+    // Realocare daca vectorul e plin
+    if (*count >= *cap) {
+        int new_cap = (*cap == 0) ? 16 : (*cap * 2);
         DiagSeg *tmp = (DiagSeg *)realloc(*seg, new_cap * sizeof(DiagSeg));
-        if(!tmp) return;
+        if (!tmp) {
+            perror("[Eroare][Scheduler] Nu s-a putut realoca memoria pentru diagrama");
+            exit(1); // Eroare critica de sistem
+        }
         *seg = tmp;
         *cap = new_cap;
     }
 
-    //adaugam si segment nou
+    // Adaugare segment nou
     (*seg)[*count].pid = pid;
     (*seg)[*count].start = start;
     (*seg)[*count].end = end;
     (*count)++;
-    
 }
 
+// Afiseaza Diagrama Gantt Compacta
+static void diag_print(DiagSeg *seg, int count) {
+    if (count == 0) return;
 
-//functie pentru afisare, prima linie e cu procesele pe segmente, a doua linie cu marcajele de timp
-static void diag_print(DiagSeg *seg, int count)
-{
-    printf("[Scheduler] Diagrama compacta:\n");
-    printf("[Scheduler] ");
+    printf("\n[Scheduler] Diagrama Gantt:\n");
+    printf("[Timeline] ");
 
-    for (int i = 0; i < count; i++)
-    {
+    // Linia cu procesele
+    for (int i = 0; i < count; i++) {
         if (seg[i].pid == -1)
             printf("| %-4s ", "IDLE");
         else
             printf("| P%-3d ", seg[i].pid);
     }
-
-
     printf("|\n");
 
-    printf("[Scheduler] ");
-    for (int i = 0; i < count; i++)
-    {
-        printf("| %-4d ", seg[i].start);
+    // Linia cu timpii
+    printf("[Time]     ");
+    printf("%-7d", seg[0].start); // Primul timp
+
+    for (int i = 0; i < count; i++) {
+        // Calculam spatierea pentru a alinia numerele sub barele verticale
+        printf("%-7d", seg[i].end);
     }
-    printf("|");
-
-    if (count > 0)
-        printf(" %d", seg[count - 1].end);
-    printf("\n");
-
-
+    printf("\n\n");
 }
 
-//apelam functia de mai jos daca avem 2 procese cu aceeasi prioritate
-static int tie(Process *a, Process *b)
-{
+// Tie-breaker: 1. Arrival Time, 2. PID
+static int tie(Process *a, Process *b) {
     if(a->arrival_time != b->arrival_time)
-        return a->arrival_time < b->arrival_time; // alegem procesul care a venit mai repede
-    return a->pid < b->pid; //daca au acelasi arrival_time, il algem pe cel cu pid mai mic
+        return a->arrival_time < b->arrival_time;
+    return a->pid < b->pid;
 }
 
-
-//DE MENTIONAT: 1 = PRIORITATE MAXIMA => cu cat valoarea e mai mica, cu cat este mai prioritara
-//in functia de mai josm alegem care e urmatorul proces de pus in diagrama pentru varianta priority scheduling
-static int priority(Process **r, int r_size)
-{
+// Selectie Priority: Cel mai mic numar = prioritate maxima
+static int priority(Process **r, int r_size) {
     int best = 0;
-    for(int i = 1; i < r_size; i++)
-    {
-        if(r[i]->priority < r[best]->priority) best = i; // daca gasim un proces cu o valoare mai mica => prioritate mai mare
-        else if (r[i]->priority == r[best]->priority && tie(r[i], r[best])) best = i; 
-        // daca gasim un proces cu ac valoare ca best-ul de pana acum, apelam functia de mai sus, ce intorcea 1 doar daca primul argument era cel pe care voiam sa il punem urmatorul
+    for(int i = 1; i < r_size; i++) {
+        if(r[i]->priority < r[best]->priority) best = i;
+        else if (r[i]->priority == r[best]->priority && tie(r[i], r[best])) best = i;
     }
-
     return best;
 }
 
-//DE MENTIONAT SI AICI: aceeasi regula ca mai sus! daca valoarea pt deadline e mai mica => este mai urgent!
-//functia de mai jos e aceeasi ca cea de mai sus, doar ca este pentru varianta deadline
-static int edf(Process **r, int r_size)
-{
+// Selectie EDF: Cel mai mic deadline = urgenta maxima
+static int edf(Process **r, int r_size) {
     int best = 0;
-    for(int i = 1; i < r_size; i++)
-    {
-        if(r[i]->deadline < r[best]->deadline) best = i; // daca gasim un proces cu o valoare mai mica => deadline mai imp
-        else if (r[i]->deadline == r[best]->deadline && tie(r[i], r[best])) best = i; 
-        // daca gasim un proces cu ac valoare ca best-ul de pana acum, apelam functia de mai sus, ce intorcea 1 doar daca primul argument era cel pe care voiam sa il punem urmatorul
+    for(int i = 1; i < r_size; i++) {
+        if(r[i]->deadline < r[best]->deadline) best = i;
+        else if (r[i]->deadline == r[best]->deadline && tie(r[i], r[best])) best = i;
     }
-
     return best;
 }
 
-//resetam campurile pt fiecare proces
-static void init_metrics(ProcessQueue *queue)
-{
-    for(int i = 0; i < queue->size; i++)
-    {
+// Resetare metrici inainte de rulare
+static void init_metrics(ProcessQueue *queue) {
+    for(int i = 0; i < queue->size; i++) {
         Process *p = queue->items[i];
         p->remaining_time = p->burst_time;
+        p->state = STATE_NEW; // Resetam starea
         p->start_time = -1;
-        p->finish_time = -1;
+        p->finish_time = 0;
         p->waiting_time = 0;
         p->turnaround_time = 0;
         p->response_time = 0;
     }
 }
 
+static void print_table(ProcessQueue *queue, int is_edf) {
+    printf("[Scheduler] Tabel statistici finale:\n");
+    
+    if (is_edf) {
+        printf("-----------------------------------------------------------------------------\n");
+        printf("| PID | Arr  | Burst | Pri  | Dead  | Start | Finish | Wait | TAT  | Miss |\n");
+        printf("-----------------------------------------------------------------------------\n");
+    } else {
+        printf("----------------------------------------------------------------------\n");
+        printf("| PID | Arr  | Burst | Pri  | Start | Finish | Wait | TAT  | Resp |\n");
+        printf("----------------------------------------------------------------------\n");
+    }
 
-//afisam in functie de ce varianta a fost aleasa: daca mode va fi 0 -> folosim prioriy, daca va fi 1 -> folosim folosim
-static void print_table(ProcessQueue *queue, int mode)
-{
-    printf("\n[Scheduler] Tabel statistici finale:\n");
-    //varianta EDF
-    if (mode)
-    {
-        printf("[Scheduler] PID  Arr  Burst  Pri  Dead  Start  Finish  WT   TAT  RT   Miss\n");
-        printf("[Scheduler] -----------------------------------------------------------------\n");
-        for (int i = 0; i < queue->size; i++)
-        {
-            Process *p = queue->items[i];
-            //miss = deadline ratat
-            int miss;
-            if(p->finish_time > p->deadline)
-                miss = 1;
-            else
-                miss = 0;
-
-            printf("[Scheduler] P%-3d %-4d %-5d %-4d %-5d %-6d %-7d %-4d %-4d %-4d %-4s\n",
+    for (int i = 0; i < queue->size; i++) {
+        Process *p = queue->items[i];
+        
+        if (is_edf) {
+            int miss = (p->finish_time > p->deadline) ? 1 : 0;
+            printf("| P%-3d| %-5d| %-6d| %-5d| %-6d| %-6d| %-7d| %-5d| %-5d| %-5s|\n",
                    p->pid, p->arrival_time, p->burst_time, p->priority, p->deadline,
                    p->start_time, p->finish_time,
-                   p->waiting_time, p->turnaround_time, p->response_time,
+                   p->waiting_time, p->turnaround_time, 
                    miss ? "YES" : "NO");
-        }
-    }
-    //varianta PRIORITY 
-    else
-    {
-        printf("[Scheduler] PID  Arr  Burst  Pri  Start  Finish  WT   TAT  RT\n");
-        printf("[Scheduler] -------------------------------------------------\n");
-        for (int i = 0; i < queue->size; i++) 
-        {
-            Process *p = queue->items[i];
-            printf("[Scheduler] P%-3d %-4d %-5d %-4d %-6d %-7d %-4d %-4d %-4d\n",
+        } else {
+            printf("| P%-3d| %-5d| %-6d| %-5d| %-6d| %-7d| %-5d| %-5d| %-5d|\n",
                    p->pid, p->arrival_time, p->burst_time, p->priority,
                    p->start_time, p->finish_time,
                    p->waiting_time, p->turnaround_time, p->response_time);
         }
     }
+    printf("----------------------------------------------------------------------\n");
 }
 
+static void print_summary(ProcessQueue *queue, int total_time, int busy_time) {
+    long sum_wait = 0, sum_tat = 0, sum_resp = 0;
 
-
-
-//functie pentru a afisa rezumatul
-static void print_summary(ProcessQueue *queue, int total_time, int busy_time)
-{
-    // sum1 - suma timpilor de asteptare ; sum2 - totalul timpilor petrecuti in sistem de toate procesele ; sum3 - totalul timpilor pana la prima executie pentru toate procesele
-    long sum1 = 0, sum2 = 0, sum3 = 0;
-
-    for(int i = 0; i < queue->size; i++)
-    {
+    for(int i = 0; i < queue->size; i++) {
         Process *p = queue->items[i];
-        sum1 += p->waiting_time;
-        sum2 += p->turnaround_time;
-        sum3 += p->response_time;
+        sum_wait += p->waiting_time;
+        sum_tat += p->turnaround_time;
+        sum_resp += p->response_time;
     }
 
-    //avg1, avg2, avg3 - mediile corespunzatoare sumelor de mai sus
-    double avg1, avg2, avg3;
-    if(queue->size > 0)
-    {
-        avg1 = (double) sum1 / queue->size;
-        avg2 = (double) sum2 / queue->size;
-        avg3 = (double) sum3 / queue->size;
-    }
-    else
-    {
-        avg1 = 0.0;
-        avg2 = 0.0;
-        avg3 = 0.0;
-    }
-
-    //calculam cpu util pt a vedea performanta
-    double cpu_util;
-    if(total_time > 0)
-        cpu_util = 100.0 * (double)busy_time / (double)total_time;
-    else
-        cpu_util = 0.0;
+    double avg_wait = (queue->size > 0) ? (double)sum_wait / queue->size : 0.0;
+    double avg_tat = (queue->size > 0) ? (double)sum_tat / queue->size : 0.0;
+    double avg_resp = (queue->size > 0) ? (double)sum_resp / queue->size : 0.0;
+    
+    double cpu_util = (total_time > 0) ? 100.0 * (double)busy_time / total_time : 0.0;
 
     printf("\n[Scheduler] Rezumat performanta:\n");
-    printf("[Scheduler] Total time: %d\n", total_time);
-    printf("[Scheduler] Busy time : %d\n", busy_time);
-    printf("[Scheduler] CPU Util  : %.2f%%\n", cpu_util);
-    printf("[Scheduler] Avg waiting time    : %.2f\n", avg1);
-    printf("[Scheduler] Avg turnaround time   : %.2f\n", avg2);
-    printf("[Scheduler] Avg response time    : %.2f\n", avg3);
-
-
+    printf("   > Timp Total Simulare : %d unitati\n", total_time);
+    printf("   > Timp CPU Activ      : %d unitati\n", busy_time);
+    printf("   > Utilizare CPU       : %.2f%%\n", cpu_util);
+    printf("   > Avg Turnaround Time : %.2f\n", avg_tat);
+    printf("   > Avg Waiting Time    : %.2f\n", avg_wait);
+    if(avg_resp > 0) printf("   > Avg Response Time   : %.2f\n", avg_resp);
 }
 
-//definim un pointer la functie pt selectie
+// Definim tipul functiei pointer
 typedef int(*SelectFunc)(Process **r, int r_size);
 
+static int run(ProcessQueue *queue, SelectFunc select_func, int is_edf_mode) {
+    init_metrics(queue); // Resetam procesele
+    
+    int n = queue->size;
+    int completed = 0;
+    int current_time = 0;
+    int busy_time = 0;
 
-static int run(ProcessQueue *queue, SelectFunc select_func, int mode)
-{
-    init_metrics(queue);
-    int n = queue->size; //nr de procese
-    int completed = 0; //cate procese s-au terminat
-    int time = 0; //de cat timp in simulare
-    int busy_time = 0; //cat CPU a fost ocupat
+    // Ready Queue (Vector de pointeri catre procese)
+    Process **ready_queue = (Process **)malloc(n * sizeof(Process *));
+    int rq_size = 0;
 
-    Process **r = (Process **)malloc(n * sizeof(Process *)); //vector de procese
-    int r_size = 0;
-
-    //ne asiguram ca nu adaugam acelasi produs de mai mutle ori
-    int *added = (int*)calloc(n, sizeof(int)); // adica marcam aici daca am introdus deja un proces
-
-    if(!r || !added)
-    {
-        fprintf(stderr, "[Scheduler] Eroare de alocare memorie\n");
-        free(r);
-        free(added);
+    if (!ready_queue) {
+        fprintf(stderr, "[Eroare][Scheduler] Nu s-a putut aloca memoria interna (Ready Queue).\n");
         return -1;
     }
-    DiagSeg *seg = NULL;
+
+    // Variabile pentru Gantt
+    DiagSeg *segments = NULL;
     int seg_count = 0;
     int seg_cap = 0;
+    
+    int current_pid = -1; // -1 = IDLE
+    int seg_start_time = 0;
 
-    int current_pid = -1;
-    int seg_start = 0;
-
-
-    while(completed < n)
-    {
-        //aici adaugam procese sosite
-        for(int i = 0; i < n; i++)
-        {
+    // --- BUCLA PRINCIPALA (Tick-by-Tick) ---
+    while (completed < n) {
+        
+        // 1. Verificam ce procese noi au sosit
+        for (int i = 0; i < n; i++) {
             Process *p = queue->items[i];
-            if(!added[i] && p->arrival_time <= time) // verificam daca poate fi adaugat si daca nu a mai fost adaugat pana acum
-            {
-                r[r_size++] = p;
-                added[i] = 1;
+            // Folosim p->state pentru a sti daca l-am bagat deja in coada
+            if (p->state == STATE_NEW && p->arrival_time <= current_time) {
+                ready_queue[rq_size++] = p;
+                p->state = STATE_READY; 
             }
         }
 
-        if(r_size == 0)
-        {
-            //lucram cu CPU - daca r e goala -> avem idle cpu
-            if(current_pid != -1)
-            {
-                diag_add(&seg, &seg_count, &seg_cap, current_pid, seg_start, time);
+        // 2. CPU IDLE?
+        if (rq_size == 0) {
+            if (current_pid != -1) {
+                // Tocmai am terminat un proces, intram in IDLE
+                diag_add(&segments, &seg_count, &seg_cap, current_pid, seg_start_time, current_time);
                 current_pid = -1;
-                seg_start = time;
+                seg_start_time = current_time;
             }
-            time++;
-            continue;
+            current_time++; // Timpul trece chiar daca nu facem nimic
+            continue; 
         }
 
-        //alegem procesul
-        int id = select_func(r, r_size);
-        Process *p = r[id];
+        // 3. Selectia Procesului (Priority sau EDF)
+        int selected_idx = select_func(ready_queue, rq_size);
+        Process *p = ready_queue[selected_idx];
 
-        //schimbam procesele si inchidem procesul anterior
-        if(current_pid != p->pid)
-        {
-            diag_add(&seg, &seg_count, &seg_cap, current_pid, seg_start, time);
+        // 4. Context Switch (Schimbare proces in executie)
+        if (current_pid != p->pid) {
+            diag_add(&segments, &seg_count, &seg_cap, current_pid, seg_start_time, current_time);
             current_pid = p->pid;
-            seg_start = time;
+            seg_start_time = current_time;
         }
 
-        if(p->start_time == -1)
-        {
-            p->start_time = time;
+        // 5. Start Logic
+        if (p->start_time == -1) {
+            p->start_time = current_time;
             p->response_time = p->start_time - p->arrival_time;
         }
+        p->state = STATE_RUNNING;
 
-        //ruleaza 
+        // 6. Executie (1 unitate de timp)
         p->remaining_time--;
         busy_time++;
-        time++;
+        current_time++;
 
-        //procesul a terminat
-        if(p->remaining_time == 0)
-        {
-            p->finish_time = time;
+        // 7. Terminare Proces
+        if (p->remaining_time == 0) {
+            p->state = STATE_FINISHED;
+            p->finish_time = current_time;
+            
             p->turnaround_time = p->finish_time - p->arrival_time;
             p->waiting_time = p->turnaround_time - p->burst_time;
 
-            //scoatem din queue
-            for(int j = id; j < r_size - 1; j++)
-                r[j] = r[j + 1];
-            r_size--;
-
-            completed++; // maracam ca am incheiat
+            // Eliminare din Ready Queue (Shift stanga)
+            for (int k = selected_idx; k < rq_size - 1; k++) {
+                ready_queue[k] = ready_queue[k + 1];
+            }
+            rq_size--;
+            completed++;
         }
     }
 
-    //inchidem si ultimul segment
-    diag_add(&seg, &seg_count, &seg_cap, current_pid, seg_start, time);
+    // Inchidem ultimul segment ramas deschis
+    diag_add(&segments, &seg_count, &seg_cap, current_pid, seg_start_time, current_time);
 
+    // --- AFISARE REZULTATE ---
+    diag_print(segments, seg_count);
+    print_table(queue, is_edf_mode);
+    print_summary(queue, current_time, busy_time);
 
-    //facem acum si afisarile
-    diag_print(seg, seg_count);
-    print_table(queue, mode);
-    print_summary(queue, time, busy_time);
-
-
-    free(seg);
-    free(r);
-    free(added);
-    return 0;
-
-
-}
-
-
-
-
-// Funcții interne (schelet)
-// Le facem să returneze int ca să poată semnala erori pe viitor
-int run_priority_scheduling(ProcessQueue *queue) {
-    printf("[Scheduler] Rulare algoritm: PRIORITY SCHEDULING\n");
+    // Curatenie memorie interna
+    free(segments);
+    free(ready_queue);
     
-
-    if(run(queue, priority, 0) == -1)
-        return -1;
-
     return 0; // Succes
 }
 
-int run_edf_scheduling(ProcessQueue *queue) 
-{
-    printf("[Scheduler] Rulare algoritm: EARLIEST DEADLINE FIRST\n");
+int run_priority_scheduling(ProcessQueue *queue) {
+    if (!queue) return -1;
+    printf("\n[Scheduler] >>> Rulare Algoritm: PRIORITY SCHEDULING (Preemptiv) <<<\n");
     
-    if(run(queue, edf, 1) == -1)
+    // Apelam motorul cu functia de selectie 'priority' si modul 0 (Non-EDF)
+    if (run(queue, priority, 0) == -1) { 
+        fprintf(stderr, "[Eroare][Scheduler] Algoritmul Priority a esuat intern.\n");
         return -1;
+    }
+    return 0;
+}
 
+int run_edf_scheduling(ProcessQueue *queue) {
+    if (!queue) return -1;
+    printf("\n[Scheduler] >>> Rulare Algoritm: REAL-TIME (Earliest Deadline First) <<<\n");
+    
+    // Apelam motorul cu functia de selectie 'edf' si modul 1 (EDF)
+    if (run(queue, edf, 1) == -1) {
+        return -1;
+    }
 
-    //
+    // Analiza specifica Real-Time (Post-Processing)
     int misses = 0;
-    for(int i = 0; i < queue->size; i++)
-    {
+    for(int i = 0; i < queue->size; i++) {
          Process *p = queue->items[i];
         if(p->finish_time > p->deadline) misses++;
     }
 
+    printf("\n[Scheduler] Analiza Fezabilitate (Real-Time):\n");
     if(misses > 0)
-        printf("[Scheduler] %d procese au depasit deadline-ul!!\n", misses);
+        printf("   [FAIL] %d procese au depasit deadline-ul! Sistemul este supraincarcat.\n", misses);
     else
-        printf("[Scheduler] Rezultat bun si posibil! Niciun proces nu a depasit deadline-ul!\n");
+        printf("   [OK]   Sistem FEZABIL! Toate procesele au terminat inainte de deadline.\n");
 
-    return 0; // Succes
+    return 0;
 }
 
-// Funcția principală (Dispatcher)
 int run_scheduler(ProcessQueue *queue, SchedulingAlgorithm algorithm) {
-    printf("\n[Scheduler] Pornire motor simulare...\n");
-    printf("[Scheduler] Analiza a %d procese.\n", queue->size);
+    // 1. Validari de baza (Programare Defensiva)
+    if (queue == NULL) {
+        fprintf(stderr, "[Eroare][Scheduler] Pointerul catre coada este NULL!\n");
+        return -1;
+    }
+    if (queue->size == 0) {
+        printf("[Avertisment][Scheduler] Coada este goala. Nu sunt procese de planificat.\n");
+        return 0;
+    }
+    if (queue->items == NULL) {
+        fprintf(stderr, "[Eroare][Scheduler] Structura interna a cozii este corupta.\n");
+        return -1;
+    }
+
+    printf("\n[Scheduler] Initializare motor simulare...\n");
+    printf("[Scheduler] Se analizeaza %d procese.\n", queue->size);
 
     int result = 0;
 
+    // 2. Selectie Algoritm
     switch (algorithm) {
         case SCHED_PRIORITY:
             result = run_priority_scheduling(queue);
@@ -396,16 +339,16 @@ int run_scheduler(ProcessQueue *queue, SchedulingAlgorithm algorithm) {
             break;
             
         default:
-            fprintf(stderr, "[Scheduler] Eroare: Algoritm intern necunoscut!\n");
-            return -1; // Eroare critică
+            fprintf(stderr, "[Eroare][Scheduler] Algoritm necunoscut (Cod: %d)!\n", algorithm);
+            return -1; 
     }
 
-    if (result == -1) {
-        fprintf(stderr, "[Scheduler] Eroare fatala in timpul simularii.\n");
+    // 3. Verificare Rezultat
+    if (result != 0) {
+        fprintf(stderr, "[Eroare][Scheduler] Simulare oprita prematur din cauza unei erori interne.\n");
         return -1;
     }
 
-    printf("[Scheduler] Simulare terminata.\n");
+    printf("\n[Scheduler] Simulare finalizata cu succes.\n");
     return 0;
 }
-
