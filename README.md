@@ -3,7 +3,7 @@
 **Curs:** Sisteme de Operare  
 **Echipa:** Răzvan & Maia
 
-## 📋 Tema Proiectului
+## Tema Proiectului
 
 Scopul acestui proiect este scrierea unui **simulator de procese** care să fie folosit pentru a evalua performanța algoritmilor de scheduling. Aplicația trebuie să suporte:
 1.  **Priority Scheduling** (Planificare pe bază de prioritate - Preemptiv).
@@ -14,14 +14,14 @@ Simulatorul va oferi utilizatorilor indicatori standard de performanță, precum
 * Timpul de așteptare (Waiting Time).
 * Timpul de răspuns (Turnaround Time).
 
-## 📚 Surse și Bibliografie
+## Surse și Bibliografie
 
 * [GeeksForGeeks: CPU Scheduling in Operating Systems](https://www.geeksforgeeks.org/operating-systems/cpu-scheduling-in-operating-systems/)
 * [GeeksForGeeks: Difference between Arrival Time and Burst Time](https://www.geeksforgeeks.org/operating-systems/difference-between-arrival-time-and-burst-time-in-cpu-scheduling/)
 * [GeeksForGeeks: Earliest Deadline First (EDF)](https://www.geeksforgeeks.org/operating-systems/earliest-deadline-first-edf-cpu-scheduling-algorithm/)
 * [TutorialsPoint: C function strtol](https://www.tutorialspoint.com/c_standard_library/c_function_strtol.htm)
 
-## 📝 Convenții de Codare
+## Convenții de Codare
 
 Pentru a facilita debugging-ul și urmărirea fluxului de execuție, toate mesajele afișate la consolă (`printf`) trebuie să includă tag-ul modulului din care sunt apelate.
 
