@@ -3,7 +3,9 @@
 > A preemptive CPU scheduling simulator built in C to evaluate the performance of Priority and Real-Time (EDF) algorithms. 
 
 **Course:** Operating Systems  
-**Authors:** Răzvan & Maia 
+**Authors & Contributors:** 
+* Răzvan - [@GabreanuR](https://github.com/GabreanuR)
+* Maia - [@maia-sapunaru](https://github.com/maia-sapunaru)
 
 ## Overview
 
